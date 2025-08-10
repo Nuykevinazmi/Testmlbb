@@ -1,4 +1,4 @@
-const ALLOWED_ORIGIN = "https://mlbb-checker-validator.pages.dev/"; // domain frontend
+const ALLOWED_ORIGIN = "https://8e7f3a7e.mlbb-checker-validator.pages.dev"; // domain frontend
 const API_URL = "https://accountmtapi.mobilelegends.com/"; // API MLBB
 
 export default {
