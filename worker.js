@@ -26,21 +26,32 @@ export default {
           return Response.json({ error: "Missing parameters" }, { status: 400 });
         }
 
-        // Request ke API MLBB
+        // Hash password MD5 (async)
+        const hashedPwd = await md5(password);
+
+        // Kirim request ke API MLBB
         const res = await fetch(API_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Mozilla/5.0",
+            "User-Agent": "Mozilla/5.0 (Linux; Android 12; SM-G991B) Mobile Safari/537.36",
+            "Accept": "*/*",
+            "Connection": "keep-alive",
           },
           body: new URLSearchParams({
-            account: email,
-            md5pwd: md5(password),
             op: "login",
+            account: email,
+            md5pwd: hashedPwd,
             captcha: captcha_token,
-            // param lain sesuai API MLBB sebelumnya
+            // parameter tambahan sesuai API resmi MLBB
+            lang: "en",
+            type: "1",
           }),
         });
+
+        if (!res.ok) {
+          return Response.json({ error: `MLBB API error: ${res.status}` }, { status: res.status });
+        }
 
         const data = await res.json();
 
@@ -72,13 +83,12 @@ export default {
           }
         }
 
-        return new Response(JSON.stringify(data), {
-          status: 200,
+        return Response.json(data, {
           headers: { "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
         });
 
       } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), {
+        return Response.json({ error: err.message }, {
           status: 500,
           headers: { "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
         });
@@ -92,11 +102,10 @@ export default {
   },
 };
 
-// Fungsi MD5 untuk password
-function md5(str) {
-  return crypto.subtle.digest("MD5", new TextEncoder().encode(str)).then(buf => {
-    return Array.from(new Uint8Array(buf))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
-  });
+// Fungsi MD5 async
+async function md5(str) {
+  const buf = await crypto.subtle.digest("MD5", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
 }
