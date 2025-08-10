@@ -1,4 +1,4 @@
-name = "Testmlbb"
+name = "testmlbb"
 main = "worker.js"
 compatibility_date = "2025-08-10"
 
