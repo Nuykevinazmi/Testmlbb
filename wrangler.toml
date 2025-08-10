@@ -1,0 +1,11 @@
+name = "worker-a"
+main = "worker.js"
+compatibility_date = "2025-10-10"
+
+[vars]
+SECRET_KEY = "GANTI_DENGAN_SECRET_KEY_YANG_SAMA_DENGAN_WORKER_B"
+WORKER_B_URL = "https://worker-b.domainkamu.workers.dev"
+
+[[kv_namespaces]]
+binding = "VALID_ACCOUNTS"
+id = "KV_NAMESPACE_ID_KAMU"
