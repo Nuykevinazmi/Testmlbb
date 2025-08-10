@@ -4,7 +4,7 @@ compatibility_date = "2025-08-10"
 
 [vars]
 SECRET_KEY = "3f5a1b2c4d6e7f8091a2b3c4d5e6f708"
-WORKER_B_URL = "https://worker-b.domainkamu.workers.dev"
+WORKER_B_URL = "https://testmlbbb.bonar7527.workers.dev"
 
 [[kv_namespaces]]
 binding = "VALID_ACCOUNT"
