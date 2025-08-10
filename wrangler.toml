@@ -1,11 +1,12 @@
-name = "worker-a"
+name = "Testmlbb"
 main = "worker.js"
-compatibility_date = "2025-10-10"
+compatibility_date = "2025-08-10"
 
 [vars]
-SECRET_KEY = "GANTI_DENGAN_SECRET_KEY_YANG_SAMA_DENGAN_WORKER_B"
+SECRET_KEY = "3f5a1b2c4d6e7f8091a2b3c4d5e6f708
+"
 WORKER_B_URL = "https://worker-b.domainkamu.workers.dev"
 
 [[kv_namespaces]]
-binding = "VALID_ACCOUNTS"
-id = "KV_NAMESPACE_ID_KAMU"
+binding = "VALID_ACCOUNT"
+id = "07dd21fac76a4178a37c28bad4b07ac1"
